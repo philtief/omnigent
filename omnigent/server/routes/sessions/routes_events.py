@@ -1468,20 +1468,10 @@ def register_events_routes(
             if pending_background_title is not None:
                 pending_background_title.schedule()
             return {"queued": True, "item_id": item_id}
-        dispatch_body = body
-        if body.type == "message" and body.data.get("role") == "user":
-            from omnigent.memory import prepare_turn_memory
-
-            dispatch_body = await prepare_turn_memory(
-                body,
-                conversation_id=session_id,
-                user_id=user_id or created_by or "local",
-                workspace=conv.workspace,
-            )
         dispatch = await _dispatch_session_event_to_runner(
             session_id,
             conv,
-            dispatch_body,
+            body,
             conversation_store,
             runner_client,
             agent_name=_agent.name if _agent else None,

@@ -2058,19 +2058,6 @@ class SqlAlchemyConversationStore(ConversationStore):
             if conv_row is not None:
                 conv_row.next_position = next_pos
 
-        # The managed session is the source of truth. Queue memory only after
-        # the transaction context has committed, and never make memory health
-        # part of the conversation write's success path.
-        try:
-            from omnigent.memory import capture_committed_items
-
-            capture_committed_items(self, conversation_id, persisted)
-        except Exception:  # noqa: BLE001 - optional memory must fail open
-            _logger.warning(
-                "Could not notify WikiBricks after appending session %s",
-                conversation_id,
-                exc_info=True,
-            )
         return persisted
 
     def list_projects(

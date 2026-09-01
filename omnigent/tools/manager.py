@@ -196,22 +196,6 @@ class ToolManager:
         # can drive the desktop app's browser without the spec opting in
         # (framework-owned).
         self._register_browser_tools()
-        # WikiBricks is local, optional, and framework-owned. When installed,
-        # expose its fixed five-tool contract through the same dispatch and
-        # policy path as every other Omnigent tool.
-        self._register_wikibricks_tools()
-
-    def _register_wikibricks_tools(self) -> None:
-        """Register the shared local-memory tools when WikiBricks is present."""
-        try:
-            from omnigent.memory import build_wikibricks_tools
-
-            tools = build_wikibricks_tools()
-        except Exception:
-            _logger.warning("WikiBricks tool registration failed", exc_info=True)
-            return
-        for tool in tools:
-            self._tools[tool.name()] = tool
 
     def _register_policy_tools(self) -> None:
         """
