@@ -3657,7 +3657,19 @@ async def test_kiro_native_dispatch_forwards_without_persisting() -> None:
     client = _FakeRunnerClient()
     body = SessionEventInput(
         type="message",
-        data={"role": "user", "content": [{"type": "input_text", "text": "hello"}]},
+        data={
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": "hello"},
+                {
+                    "type": "input_text",
+                    "text": (
+                        "<wikibricks-memory>\nshared context\n"
+                        "</wikibricks-memory>"
+                    ),
+                },
+            ],
+        },
     )
 
     try:
@@ -3687,6 +3699,7 @@ async def test_kiro_native_dispatch_forwards_without_persisting() -> None:
         forwarded = client.post_json_calls[1][1]
         assert forwarded["agent_id"] == "2c515637c67d0717ad0bebc2747b71bc"
         assert forwarded["model"] == "kiro-native-ui"
+        assert "shared context" in forwarded["content"][1]["text"]
     finally:
         pending_inputs.reset_for_tests()
 
@@ -3761,7 +3774,16 @@ async def test_kiro_external_prompt_matches_pending_and_reports_skipped_input() 
             "item_type": "message",
             "item_data": {
                 "role": "user",
-                "content": [{"type": "input_text", "text": "tell me a joke"}],
+                "content": [
+                    {"type": "input_text", "text": "tell me a joke"},
+                    {
+                        "type": "input_text",
+                        "text": (
+                            "<wikibricks-memory>\nshared context\n"
+                            "</wikibricks-memory>"
+                        ),
+                    },
+                ],
             },
             "response_id": "kiro:prompt-joke",
         },

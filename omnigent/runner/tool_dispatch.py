@@ -340,6 +340,18 @@ _NIMBLE_EXTRACT_TOOLS = frozenset({"nimble_extract"})
 # falls through to the harness, which has no such tool, and silently no-ops.
 _HINDSIGHT_TOOLS = frozenset({"hindsight_retain", "hindsight_recall", "hindsight_reflect"})
 
+# WikiBricks shared local memory. The fixed names come from the package's
+# public MCP contract; execution remains local and optional.
+_WIKIBRICKS_TOOLS = frozenset(
+    {
+        "wiki_search",
+        "wiki_read_full",
+        "wiki_index",
+        "wiki_write_page",
+        "wiki_promote_answer",
+    }
+)
+
 # Priority 5f.2: sys_list_models — runner-local because provider resolution
 # reads the runner host's config/credentials, same as the spawn paths.
 _LIST_MODELS_TOOLS = frozenset({"sys_list_models"})
@@ -471,6 +483,7 @@ _NATIVE_RELAY_BUILTIN_TOOLS = (
     # Memory builtins are relayed to native harnesses too — unlike web_search,
     # native harnesses have no built-in long-term memory of their own.
     | _HINDSIGHT_TOOLS
+    | _WIKIBRICKS_TOOLS
 )
 
 
@@ -626,6 +639,7 @@ _ALL_LOCAL_TOOLS = (
     | _NIMBLE_RESEARCH_TOOLS
     | _NIMBLE_EXTRACT_TOOLS
     | _HINDSIGHT_TOOLS
+    | _WIKIBRICKS_TOOLS
     | _TIMER_TOOLS
     | _TASK_LIFECYCLE_TOOLS
     | _SKILL_TOOLS
@@ -3009,6 +3023,29 @@ async def _execute_hindsight_tool(
     return await asyncio.to_thread(tool.invoke, json.dumps(args), ctx)
 
 
+async def _execute_wikibricks_tool(
+    args: _JsonObject,
+    *,
+    tool_name: str,
+    conversation_id: str | None = None,
+    task_id: str | None = None,
+    agent_id: str | None = None,
+) -> str:
+    """Run one optional WikiBricks tool against the shared local database."""
+    from omnigent.memory import build_wikibricks_tools
+
+    tools = {tool.name(): tool for tool in build_wikibricks_tools()}
+    tool = tools.get(tool_name)
+    if tool is None:
+        return json.dumps({"error": "WikiBricks is not installed or is disabled"})
+    ctx = ToolContext(
+        task_id=task_id or tool_name,
+        agent_id=agent_id or "omnigent",
+        conversation_id=conversation_id,
+    )
+    return await asyncio.to_thread(tool.invoke, json.dumps(args), ctx)
+
+
 def _has_subagent(
     sub_agent_name: str,
     agent_spec: AgentSpec | None,
@@ -5200,6 +5237,14 @@ async def execute_tool(
                 args,
                 tool_name=tool_name,
                 agent_spec=agent_spec,
+                conversation_id=conversation_id,
+                task_id=task_id,
+                agent_id=agent_id,
+            )
+        elif tool_name in _WIKIBRICKS_TOOLS:
+            output = await _execute_wikibricks_tool(
+                args,
+                tool_name=tool_name,
                 conversation_id=conversation_id,
                 task_id=task_id,
                 agent_id=agent_id,

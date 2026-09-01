@@ -1993,6 +1993,14 @@ async def _persist_external_conversation_item(
     :returns: Store-assigned conversation item id.
     """
     item = _parse_external_conversation_item(body)
+    if item.type == "message" and isinstance(item.data, MessageData):
+        from omnigent.memory import strip_memory_context
+
+        clean_content = strip_memory_context(item.data.content)
+        if isinstance(clean_content, list) and clean_content != item.data.content:
+            item = item.model_copy(
+                update={"data": item.data.model_copy(update={"content": clean_content})}
+            )
     # A native user message round-tripping back from the transcript:
     # drain its optimistic pending-input entry (FIFO) and fold the
     # entry's file blocks (image / file) into the item BEFORE persisting.
@@ -4402,7 +4410,16 @@ async def _forward_event_to_runner(
     import uuid
 
     turn_id = f"turn_{uuid.uuid4().hex}"
-    item = _build_new_item(body, turn_id, created_by=created_by)
+    persisted_body = body
+    if body.type == "message":
+        from omnigent.memory import strip_memory_context
+
+        content = strip_memory_context(body.data.get("content"))
+        if isinstance(content, list) and content != body.data.get("content"):
+            data = dict(body.data)
+            data["content"] = content
+            persisted_body = body.model_copy(update={"data": data})
+    item = _build_new_item(persisted_body, turn_id, created_by=created_by)
     persisted_items = await asyncio.to_thread(
         conversation_store.append,
         session_id,
@@ -5123,7 +5140,9 @@ async def _dispatch_session_event_to_runner_impl(
         # server-side immediately (replayed into the snapshot). Roll it
         # back on any failure/cancellation so a message the TUI never
         # received doesn't replay as a ghost.
-        content = body.data.get("content")
+        from omnigent.memory import strip_memory_context
+
+        content = strip_memory_context(body.data.get("content"))
         pending_id: str | None = (
             pending_inputs.record(session_id, content, created_by=created_by)
             if isinstance(content, list) and content
